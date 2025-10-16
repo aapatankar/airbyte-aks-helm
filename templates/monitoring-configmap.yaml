@@ -1,0 +1,34 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "airbyte-aks.fullname" . }}-monitoring-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "airbyte-aks.labels" . | nindent 4 }}
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 30s
+      evaluation_interval: 30s
+    
+    scrape_configs:
+    - job_name: 'airbyte-server'
+      static_configs:
+      - targets: ['airbyte-server:8000']
+      metrics_path: '/api/v1/health'
+      
+    - job_name: 'airbyte-worker'
+      static_configs:
+      - targets: ['airbyte-worker:8080']
+      
+    {{- if .Values.monitoring.azureMonitor.enabled }}
+    - job_name: 'azure-monitor'
+      azure_sd_configs:
+      - subscription_id: {{ .Values.monitoring.azureMonitor.subscriptionId | quote }}
+        tenant_id: {{ .Values.global.secretsManager.azureKeyVault.tenantId | quote }}
+        client_id: {{ .Values.global.secretsManager.azureKeyVault.clientId | quote }}
+        client_secret: {{ .Values.global.secretsManager.azureKeyVault.clientSecretSecretKey | quote }}
+    {{- end }}
+---
+{{- end }}

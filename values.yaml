@@ -1,0 +1,267 @@
+# Default values for airbyte-aks.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Global configuration for Airbyte deployment on AKS
+global:
+  # Airbyte edition: community or enterprise
+  edition: community
+  
+  # The URL where Airbyte will be accessible
+  # Replace with your actual domain
+  airbyteUrl: "https://airbyte.yourdomain.com"
+  
+  # Image configuration
+  image:
+    tag: "1.8.0"
+    pullPolicy: IfNotPresent
+    # Custom registry if using private registry
+    # registry: "your-acr.azurecr.io"
+  
+  # Authentication configuration
+  auth:
+    enabled: true
+    # For basic auth, set to false if using SSO
+    # instanceAdmin:
+    #   firstName: "Admin"
+    #   lastName: "User"
+    #   email: "admin@yourdomain.com"
+  
+  # Database configuration
+  database:
+    type: external
+    secretName: "airbyte-config-secrets"
+    host: ""  # Azure Database for PostgreSQL server
+    port: "5432"
+    name: "airbyte"
+    userSecretKey: "database-user"
+    passwordSecretKey: "database-password"
+    # SSL configuration for Azure PostgreSQL
+    sslMode: "require"
+  
+  # Storage configuration for Azure
+  storage:
+    type: "azure"
+    secretName: "airbyte-config-secrets"
+    bucket:
+      log: "airbyte-logs"
+      state: "airbyte-state"
+      workloadOutput: "airbyte-workload-output"
+      activityPayload: "airbyte-activity-payload"
+    
+    azure:
+      storageAccountName: ""  # Your Azure Storage Account name
+      containerName: "airbyte"
+      # Authentication via managed identity or storage account key
+      storageAccountKeySecretKey: "azure-storage-key"
+  
+  # Secrets manager configuration
+  secretsManager:
+    type: "AZURE_KEY_VAULT"  # or "KUBERNETES" for basic setup
+    secretName: "airbyte-config-secrets"
+    azureKeyVault:
+      vaultUrl: ""  # https://your-keyvault.vault.azure.net/
+      tenantId: ""
+      clientId: ""
+      clientSecretSecretKey: "azure-client-secret"
+
+# AKS-specific configurations
+aks:
+  # Enable Azure integrations
+  enableAzureIntegrations: true
+  
+  # Node selector for AKS node pools
+  nodeSelector:
+    kubernetes.io/os: linux
+    # agentpool: "system"  # Uncomment to specify node pool
+  
+  # Resource requirements optimized for AKS
+  resources:
+    server:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+    
+    worker:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+    
+    workloadLauncher:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "250m"
+
+# Ingress configuration for AKS
+ingress:
+  enabled: true
+  className: "nginx"  # or "azure-application-gateway" for AGIC
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    # For Azure Application Gateway Ingress Controller (AGIC)
+    # kubernetes.io/ingress.class: azure/application-gateway
+    # appgw.ingress.kubernetes.io/ssl-redirect: "true"
+  
+  hosts:
+    - host: airbyte.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+  
+  tls:
+    - secretName: airbyte-tls
+      hosts:
+        - airbyte.yourdomain.com
+
+# PostgreSQL configuration (disable if using external database)
+postgresql:
+  enabled: false  # Set to true if you want to deploy PostgreSQL in-cluster
+
+# Monitoring and observability
+monitoring:
+  enabled: true
+  
+  # Prometheus metrics
+  prometheus:
+    enabled: true
+    
+  # Azure Monitor integration
+  azureMonitor:
+    enabled: false
+    workspaceId: ""
+
+# High availability configuration
+highAvailability:
+  enabled: true
+  replicaCount:
+    server: 2
+    worker: 3
+    workloadLauncher: 2
+
+# Security configuration for AKS
+security:
+  # Pod Security Standards
+  podSecurityStandards:
+    enabled: true
+    
+  # Network policies
+  networkPolicies:
+    enabled: true
+    
+  # Service mesh integration (if using Istio)
+  serviceMesh:
+    enabled: false
+    
+  # RBAC configuration
+  rbac:
+    create: true
+    
+  # Service account configuration
+  serviceAccount:
+    create: true
+    annotations:
+      # For Azure Workload Identity
+      # azure.workload.identity/client-id: "your-client-id"
+    name: ""
+
+# Backup configuration
+backup:
+  enabled: false
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: "30d"
+  storageClass: "managed-premium"
+
+# Auto-scaling configuration
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Azure-specific service configurations
+azure:
+  # Enable Azure AD Pod Identity (deprecated, use Workload Identity instead)
+  podIdentity:
+    enabled: false
+    
+  # Enable Azure Workload Identity
+  workloadIdentity:
+    enabled: true
+    
+  # Azure Container Registry integration
+  acr:
+    enabled: false
+    name: ""
+    resourceGroup: ""
+    
+  # Azure Key Vault CSI driver
+  keyVaultCSI:
+    enabled: true
+    
+  # Azure Files for persistent storage
+  azureFiles:
+    enabled: true
+    storageClass: "azurefile-csi-premium"
+
+# Development and testing configurations
+development:
+  enabled: false
+  # Enable port-forwarding for local development
+  portForward:
+    enabled: false
+    ports:
+      webapp: 8000
+      server: 8001
+
+# Airbyte subchart configuration
+airbyte:
+  enabled: true
+  
+  # Global Airbyte configuration
+  global:
+    # Heartbeat timeout configuration - 96 hours (345,600 seconds)
+    # This configures the maximum time allowed between messages before considering a sync failed
+    heartbeat:
+      maxSecondsBetweenMessages: 345600  # 96 hours
+      failSync: true  # Enable sync failure on heartbeat timeout
+    
+    # Environment variables for Airbyte components
+    env_vars:
+      # Heartbeat configuration via environment variables
+      HEARTBEAT_MAX_SECONDS_BETWEEN_MESSAGES: "345600"
+      HEARTBEAT_FAIL_SYNC: "true"
+  
+  # Component-specific configurations
+  server:
+    extraEnvVars:
+      - name: HEARTBEAT_MAX_SECONDS_BETWEEN_MESSAGES
+        value: "345600"
+      - name: HEARTBEAT_FAIL_SYNC
+        value: "true"
+  
+  worker:
+    extraEnvVars:
+      - name: HEARTBEAT_MAX_SECONDS_BETWEEN_MESSAGES
+        value: "345600"
+      - name: HEARTBEAT_FAIL_SYNC
+        value: "true"
+  
+  workloadLauncher:
+    extraEnvVars:
+      - name: HEARTBEAT_MAX_SECONDS_BETWEEN_MESSAGES
+        value: "345600"
+      - name: HEARTBEAT_FAIL_SYNC
+        value: "true"

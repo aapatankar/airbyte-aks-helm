@@ -1,0 +1,204 @@
+# Development Values for Airbyte on AKS
+# This file contains development-friendly configurations
+
+global:
+  edition: community
+  airbyteUrl: "https://airbyte-dev.yourdomain.com"
+  
+  image:
+    tag: "1.8.0"
+    pullPolicy: Always
+  
+  # Use internal PostgreSQL for development
+  database:
+    type: internal
+  
+  # Use MinIO for development storage
+  storage:
+    type: "minio"
+  
+  # Use no-op secrets manager for development
+  secretsManager:
+    type: "no_op"
+    secretName: "airbyte-config-secrets"
+
+# Development resource allocations (smaller)
+aks:
+  enableAzureIntegrations: false
+  
+  nodeSelector:
+    kubernetes.io/os: linux
+  
+  resources:
+    server:
+      requests:
+        memory: "256Mi"
+        cpu: "125m"
+      limits:
+        memory: "512Mi"
+        cpu: "250m"
+    
+    worker:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+    
+    workloadLauncher:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+
+# Development ingress (no SSL required)
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+  
+  hosts:
+    - host: airbyte-dev.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+# Enable internal PostgreSQL for development
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "airbyte123"
+    database: "airbyte"
+  primary:
+    persistence:
+      enabled: true
+      size: 8Gi
+
+# Basic monitoring for development
+monitoring:
+  enabled: false
+
+# Single replica for development
+highAvailability:
+  enabled: false
+  replicaCount:
+    server: 1
+    worker: 1
+    workloadLauncher: 1
+
+# Relaxed security for development
+security:
+  podSecurityStandards:
+    enabled: false
+  networkPolicies:
+    enabled: false
+  rbac:
+    create: true
+  serviceAccount:
+    create: true
+
+# No backup in development
+backup:
+  enabled: false
+
+# No auto-scaling in development
+autoscaling:
+  enabled: false
+
+# Minimal Azure integrations
+azure:
+  workloadIdentity:
+    enabled: false
+  keyVaultCSI:
+    enabled: false
+  azureFiles:
+    enabled: false
+
+# Enable development features
+development:
+  enabled: true
+  portForward:
+    enabled: true
+    ports:
+      webapp: 8080
+      server: 8081
+
+# Airbyte subchart configuration
+airbyte:
+  enabled: true
+  
+  # Enable ingress for external access
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    hosts:
+      - host: airbyte-dev.yourdomain.com
+        paths:
+          - path: /
+            pathType: Prefix
+  
+  # Database configuration to match the internal PostgreSQL
+  global:
+    database:
+      type: internal
+      secretName: "airbyte-config-secrets"
+      host: "airbyte-db-svc"
+      port: 5432
+      name: "db-airbyte"  # This matches POSTGRES_DB from the container
+      user: "airbyte"     # This matches POSTGRES_USER from the container
+      userSecretKey: "database-user"
+      passwordSecretKey: "database-password"
+  
+    # Heartbeat timeout configuration - 96 hours (345,600 seconds)
+    # This configures the maximum time allowed between messages before considering a sync failed
+    heartbeat:
+      maxSecondsBetweenMessages: 345600  # 96 hours
+      failSync: true  # Enable sync failure on heartbeat timeout
+    
+    # Secrets manager configuration for development
+    secretsManager:
+      type: "no_op"
+    
+    # Environment variables for Airbyte components  
+    env_vars:
+      # Heartbeat configuration via environment variables
+      HEARTBEAT_MAX_SECONDS_BETWEEN_MESSAGES: "345600"
+      HEARTBEAT_FAIL_SYNC: "true"
+      # Secret persistence configuration
+      AIRBYTE_SECRET_PERSISTENCE: "no_op"
+      # Webapp URL configuration
+      WEBAPP_URL: "https://airbyte-dev.yourdomain.com"
+  
+  # Component-specific configurations for development
+  server:
+    extraEnvVars:
+      - name: HEARTBEAT_MAX_SECONDS_BETWEEN_MESSAGES
+        value: "345600"
+      - name: HEARTBEAT_FAIL_SYNC
+        value: "true"
+  
+  worker:
+    extraEnvVars:
+      - name: HEARTBEAT_MAX_SECONDS_BETWEEN_MESSAGES
+        value: "345600"
+      - name: HEARTBEAT_FAIL_SYNC
+        value: "true"
+  
+  workloadLauncher:
+    extraEnvVars:
+      - name: HEARTBEAT_MAX_SECONDS_BETWEEN_MESSAGES
+        value: "345600"
+      - name: HEARTBEAT_FAIL_SYNC
+        value: "true"
+  
+  # Disable webapp for now (image not available for Airbyte 2.0)
+  webapp:
+    enabled: false

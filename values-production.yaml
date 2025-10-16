@@ -1,0 +1,240 @@
+# Production Values for Airbyte on AKS
+# This file contains production-ready configurations
+
+global:
+  edition: community
+  airbyteUrl: "https://airbyte.yourdomain.com"
+  
+  image:
+    tag: "1.8.0"
+    pullPolicy: IfNotPresent
+    # Use your Azure Container Registry
+    registry: "youracr.azurecr.io"
+  
+  # External PostgreSQL database (Azure Database for PostgreSQL)
+  database:
+    type: external
+    secretName: "airbyte-config-secrets"
+    host: "your-postgres-server.postgres.database.azure.com"
+    port: "5432"
+    name: "airbyte"
+    userSecretKey: "database-user"
+    passwordSecretKey: "database-password"
+    sslMode: "require"
+  
+  # Azure Blob Storage
+  storage:
+    type: "azure"
+    secretName: "airbyte-config-secrets"
+    bucket:
+      log: "airbyte-logs"
+      state: "airbyte-state" 
+      workloadOutput: "airbyte-workload-output"
+      activityPayload: "airbyte-activity-payload"
+    
+    azure:
+      storageAccountName: "yourstorageaccount"
+      containerName: "airbyte"
+      storageAccountKeySecretKey: "azure-storage-key"
+  
+  # Azure Key Vault for secrets management
+  secretsManager:
+    type: "AZURE_KEY_VAULT"
+    secretName: "airbyte-config-secrets"
+    azureKeyVault:
+      vaultUrl: "https://your-keyvault.vault.azure.net/"
+      tenantId: "your-tenant-id"
+      clientId: "your-client-id"
+      clientSecretSecretKey: "azure-client-secret"
+
+# Production resource allocations
+aks:
+  enableAzureIntegrations: true
+  
+  nodeSelector:
+    kubernetes.io/os: linux
+    agentpool: "system"
+  
+  resources:
+    server:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+    
+    worker:
+      requests:
+        memory: "2Gi"
+        cpu: "1000m"
+      limits:
+        memory: "4Gi"
+        cpu: "2000m"
+    
+    workloadLauncher:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+
+# Production ingress with SSL
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  
+  hosts:
+    - host: airbyte.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+  
+  tls:
+    - secretName: airbyte-tls
+      hosts:
+        - airbyte.yourdomain.com
+
+# Disable internal PostgreSQL
+postgresql:
+  enabled: false
+
+# Production monitoring
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+  azureMonitor:
+    enabled: true
+    workspaceId: "your-log-analytics-workspace-id"
+
+# High availability setup
+highAvailability:
+  enabled: true
+  replicaCount:
+    server: 3
+    worker: 5
+    workloadLauncher: 2
+
+# Security hardening
+security:
+  podSecurityStandards:
+    enabled: true
+  networkPolicies:
+    enabled: true
+  rbac:
+    create: true
+  serviceAccount:
+    create: true
+    annotations:
+      azure.workload.identity/client-id: "your-workload-identity-client-id"
+
+# Production backup
+backup:
+  enabled: true
+  schedule: "0 2 * * *"
+  retention: "30d"
+  storageClass: "managed-premium"
+
+# Auto-scaling for production loads
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Azure integrations
+azure:
+  workloadIdentity:
+    enabled: true
+  keyVaultCSI:
+    enabled: true
+  azureFiles:
+    enabled: true
+    storageClass: "azurefile-csi-premium"
+
+# Disable development features
+development:
+  enabled: false
+
+# Airbyte subchart configuration
+airbyte:
+  enabled: true
+  
+  # Global Airbyte configuration
+  global:
+    # Heartbeat timeout configuration - 96 hours (345,600 seconds)
+    # This configures the maximum time allowed between messages before considering a sync failed
+    heartbeat:
+      maxSecondsBetweenMessages: 345600  # 96 hours
+      failSync: true  # Enable sync failure on heartbeat timeout
+    
+    # Environment variables for Airbyte components
+    env_vars:
+      # Heartbeat configuration via environment variables
+      HEARTBEAT_MAX_SECONDS_BETWEEN_MESSAGES: "345600"
+      HEARTBEAT_FAIL_SYNC: "true"
+  
+  # Component-specific configurations with enhanced heartbeat settings
+  server:
+    replicaCount: 2
+    resources:
+      requests:
+        memory: "2Gi"
+        cpu: "1000m"
+      limits:
+        memory: "4Gi" 
+        cpu: "2000m"
+    extraEnvVars:
+      - name: HEARTBEAT_MAX_SECONDS_BETWEEN_MESSAGES
+        value: "345600"
+      - name: HEARTBEAT_FAIL_SYNC
+        value: "true"
+  
+  worker:
+    replicaCount: 3
+    resources:
+      requests:
+        memory: "4Gi"
+        cpu: "2000m"
+      limits:
+        memory: "8Gi"
+        cpu: "4000m"
+    extraEnvVars:
+      - name: HEARTBEAT_MAX_SECONDS_BETWEEN_MESSAGES
+        value: "345600"
+      - name: HEARTBEAT_FAIL_SYNC
+        value: "true"
+  
+  workloadLauncher:
+    replicaCount: 2
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+    extraEnvVars:
+      - name: HEARTBEAT_MAX_SECONDS_BETWEEN_MESSAGES
+        value: "345600"
+      - name: HEARTBEAT_FAIL_SYNC
+        value: "true"
+  
+  webapp:
+    replicaCount: 2
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"

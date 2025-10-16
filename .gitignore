@@ -1,0 +1,57 @@
+.DS_Store
+*.log
+*.tmp
+.env
+.env.local
+.env.*.local
+
+# Backup directories
+backups/
+*.backup
+
+# Test output
+test-output/
+coverage/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Helm package files
+*.tgz
+
+# Temporary files
+tmp/
+temp/
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+
+# Azure CLI local settings
+.azure/
+
+# Terraform files (if any)
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+
+# Kubernetes temporary files
+kubeconfig*
+*.kubeconfig
+
+# Secrets and sensitive data
+secrets/
+*.key
+*.crt
+*.pem
+config.yaml
+*-secrets.yaml
+
+# Local development overrides
+values-local.yaml
+local-*.yaml

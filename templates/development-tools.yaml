@@ -1,0 +1,122 @@
+{{- if .Values.development.enabled }}
+{{- if .Values.development.portForward.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "airbyte-aks.fullname" . }}-dev-scripts
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "airbyte-aks.labels" . | nindent 4 }}
+data:
+  port-forward.sh: |
+    #!/bin/bash
+    set -e
+    
+    echo "Setting up port forwarding for Airbyte development..."
+    
+    # Get pod names
+    WEBAPP_POD=$(kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/component=webapp -o jsonpath='{.items[0].metadata.name}')
+    SERVER_POD=$(kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/component=server -o jsonpath='{.items[0].metadata.name}')
+    
+    echo "Webapp Pod: $WEBAPP_POD"
+    echo "Server Pod: $SERVER_POD"
+    
+    # Start port forwarding in background
+    echo "Starting port forwarding..."
+    kubectl port-forward -n {{ .Release.Namespace }} $WEBAPP_POD {{ .Values.development.portForward.ports.webapp }}:80 &
+    kubectl port-forward -n {{ .Release.Namespace }} $SERVER_POD {{ .Values.development.portForward.ports.server }}:8001 &
+    
+    echo "Port forwarding started!"
+    echo "Webapp: http://localhost:{{ .Values.development.portForward.ports.webapp }}"
+    echo "Server: http://localhost:{{ .Values.development.portForward.ports.server }}"
+    echo ""
+    echo "Press Ctrl+C to stop port forwarding"
+    
+    # Wait for user interrupt
+    trap 'echo "Stopping port forwarding..."; kill $(jobs -p); exit' SIGINT
+    wait
+
+  debug-info.sh: |
+    #!/bin/bash
+    echo "=== Airbyte Debug Information ==="
+    echo ""
+    
+    echo "=== Pods ==="
+    kubectl get pods -n {{ .Release.Namespace }} -o wide
+    echo ""
+    
+    echo "=== Services ==="
+    kubectl get services -n {{ .Release.Namespace }}
+    echo ""
+    
+    echo "=== Ingress ==="
+    kubectl get ingress -n {{ .Release.Namespace }}
+    echo ""
+    
+    echo "=== Secrets ==="
+    kubectl get secrets -n {{ .Release.Namespace }}
+    echo ""
+    
+    echo "=== ConfigMaps ==="
+    kubectl get configmaps -n {{ .Release.Namespace }}
+    echo ""
+    
+    echo "=== Recent Events ==="
+    kubectl get events -n {{ .Release.Namespace }} --sort-by=.metadata.creationTimestamp | tail -10
+    echo ""
+    
+    echo "=== Pod Logs (Server) ==="
+    kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/component=server --tail=20
+    echo ""
+    
+    echo "=== Pod Logs (Worker) ==="
+    kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/component=worker --tail=20
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "airbyte-aks.fullname" . }}-dev-setup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "airbyte-aks.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "airbyte-aks.selectorLabels" . | nindent 8 }}
+        component: dev-setup
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: dev-setup
+        image: alpine/k8s:1.24.0
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Development mode is enabled!"
+          echo "Useful commands:"
+          echo ""
+          echo "# Get debug information:"
+          echo "kubectl exec -it deployment/{{ include "airbyte-aks.fullname" . }}-dev-setup -- sh /scripts/debug-info.sh"
+          echo ""
+          echo "# Set up port forwarding:"
+          echo "kubectl exec -it deployment/{{ include "airbyte-aks.fullname" . }}-dev-setup -- sh /scripts/port-forward.sh"
+          echo ""
+          echo "# Access the webapp:"
+          echo "kubectl port-forward -n {{ .Release.Namespace }} service/airbyte-webapp {{ .Values.development.portForward.ports.webapp }}:80"
+        volumeMounts:
+        - name: dev-scripts
+          mountPath: /scripts
+      volumes:
+      - name: dev-scripts
+        configMap:
+          name: {{ include "airbyte-aks.fullname" . }}-dev-scripts
+          defaultMode: 0755
+---
+{{- end }}
+{{- end }}

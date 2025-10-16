@@ -1,0 +1,28 @@
+apiVersion: v2
+name: airbyte-aks
+description: A Helm chart for deploying Airbyte to Azure Kubernetes Service (AKS)
+type: application
+version: 2.0.0
+appVersion: "2.0.0"
+
+dependencies:
+  - name: airbyte
+    version: "2.0.18"
+    repository: https://airbytehq.github.io/charts
+    condition: airbyte.enabled
+    alias: airbyte
+
+keywords:
+  - airbyte
+  - data-integration
+  - etl
+  - azure
+  - aks
+
+maintainers:
+  - name: Platform Team
+    email: platform-team@company.com
+
+home: https://airbyte.com
+sources:
+  - https://github.com/airbytehq/airbyte

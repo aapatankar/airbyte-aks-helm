@@ -1,0 +1,26 @@
+{{- if .Values.airbyte.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "airbyte-aks.fullname" . }}-flags-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "airbyte-aks.labels" . | nindent 4 }}
+data:
+  flags.yml: |
+    # Airbyte feature flags configuration
+    # This file configures various Airbyte platform features and behaviors
+    
+    # Heartbeat configuration
+    # Maximum time allowed between messages before considering a sync failed
+    # Default is 3 hours (10800 seconds), we're setting it to 96 hours (345600 seconds)
+    heartbeat-max-seconds-between-messages: {{ .Values.airbyte.global.heartbeat.maxSecondsBetweenMessages | default 345600 }}
+    
+    # Whether to fail syncs when heartbeat timeout is reached
+    heartbeat.failSync: {{ .Values.airbyte.global.heartbeat.failSync | default true }}
+    
+    # Additional feature flags can be added here as needed
+    # Example:
+    # some-other-feature: true
+    # feature-xyz: false
+{{- end }}

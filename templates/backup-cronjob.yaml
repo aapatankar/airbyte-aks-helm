@@ -1,0 +1,112 @@
+{{- if .Values.backup.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "airbyte-aks.fullname" . }}-backup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "airbyte-aks.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "airbyte-aks.selectorLabels" . | nindent 12 }}
+            component: backup
+        spec:
+          {{- if .Values.security.serviceAccount.create }}
+          serviceAccountName: {{ include "airbyte-aks.serviceAccountName" . }}
+          {{- end }}
+          {{- if .Values.aks.nodeSelector }}
+          nodeSelector:
+            {{- include "airbyte-aks.nodeSelector" . | nindent 12 }}
+          {{- end }}
+          restartPolicy: OnFailure
+          containers:
+          - name: postgres-backup
+            image: postgres:13
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              BACKUP_FILE="airbyte-backup-$(date +%Y%m%d_%H%M%S).sql"
+              
+              echo "Starting backup of Airbyte database..."
+              pg_dump \
+                --host="${DB_HOST}" \
+                --port="${DB_PORT}" \
+                --username="${DB_USER}" \
+                --dbname="${DB_NAME}" \
+                --verbose \
+                --clean \
+                --no-owner \
+                --no-privileges \
+                > "/backup/${BACKUP_FILE}"
+              
+              echo "Backup completed: ${BACKUP_FILE}"
+              
+              # Upload to Azure Storage using azcopy (if available)
+              if command -v azcopy &> /dev/null; then
+                echo "Uploading backup to Azure Storage..."
+                azcopy copy "/backup/${BACKUP_FILE}" \
+                  "https://${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net/backups/${BACKUP_FILE}${AZURE_SAS_TOKEN}"
+              fi
+              
+              # Clean up old backups (keep only recent ones)
+              find /backup -name "airbyte-backup-*.sql" -mtime +{{ .Values.backup.retention | default "30d" | regexReplaceAll "d$" "" }} -delete
+            env:
+            - name: DB_HOST
+              value: {{ .Values.global.database.host | quote }}
+            - name: DB_PORT
+              value: {{ .Values.global.database.port | quote }}
+            - name: DB_NAME
+              value: {{ .Values.global.database.name | quote }}
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.database.secretName }}
+                  key: {{ .Values.global.database.userSecretKey }}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.database.secretName }}
+                  key: {{ .Values.global.database.passwordSecretKey }}
+            {{- if eq .Values.global.storage.type "azure" }}
+            - name: AZURE_STORAGE_ACCOUNT
+              value: {{ .Values.global.storage.azure.storageAccountName | quote }}
+            - name: AZURE_SAS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.storage.secretName }}
+                  key: azure-sas-token
+                  optional: true
+            {{- end }}
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: {{ include "airbyte-aks.fullname" . }}-backup-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "airbyte-aks.fullname" . }}-backup-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "airbyte-aks.labels" . | nindent 4 }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  {{- if .Values.backup.storageClass }}
+  storageClassName: {{ .Values.backup.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: 10Gi
+---
+{{- end }}
