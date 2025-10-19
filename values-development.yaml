@@ -6,7 +6,7 @@ global:
   airbyteUrl: "https://airbyte-dev.yourdomain.com"
   
   image:
-    tag: "1.8.0"
+    tag: "2.0.0"
     pullPolicy: Always
   
   # Use internal PostgreSQL for development
@@ -21,6 +21,10 @@ global:
   secretsManager:
     type: "no_op"
     secretName: "airbyte-config-secrets"
+
+# Disable parent chart ingress - use Airbyte subchart ingress instead
+ingress:
+  enabled: false
 
 # Development resource allocations (smaller)
 aks:
@@ -54,51 +58,47 @@ aks:
         memory: "256Mi"
         cpu: "200m"
 
-# Development ingress (no SSL required)
-ingress:
-  enabled: true
-  className: "nginx"
-  annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+# Airbyte subchart configuration
+airbyte:
+  # Disable all ingress configurations for now
+  ingress:
+    enabled: false
   
-  hosts:
-    - host: airbyte-dev.yourdomain.com
-      paths:
-        - path: /
-          pathType: Prefix
+  webapp:
+    ingress:
+      enabled: false
 
-# Enable internal PostgreSQL for development
-postgresql:
-  enabled: true
-  auth:
-    postgresPassword: "airbyte123"
-    database: "airbyte"
-  primary:
-    persistence:
-      enabled: true
-      size: 8Gi
+  # Enable internal PostgreSQL for development
+  postgresql:
+    enabled: true
+    auth:
+      postgresPassword: "airbyte123"
+      database: "airbyte"
+    primary:
+      persistence:
+        enabled: true
+        size: 8Gi
 
-# Basic monitoring for development
-monitoring:
-  enabled: false
-
-# Single replica for development
-highAvailability:
-  enabled: false
-  replicaCount:
-    server: 1
-    worker: 1
-    workloadLauncher: 1
-
-# Relaxed security for development
-security:
-  podSecurityStandards:
+  # Basic monitoring for development
+  monitoring:
     enabled: false
-  networkPolicies:
+
+  # Single replica for development
+  highAvailability:
     enabled: false
-  rbac:
-    create: true
+    replicaCount:
+      server: 1
+      worker: 1
+      workloadLauncher: 1
+
+  # Relaxed security for development
+  security:
+    podSecurityStandards:
+      enabled: false
+    networkPolicies:
+      enabled: false
+    rbac:
+      create: true
   serviceAccount:
     create: true
 

@@ -1,0 +1,67 @@
+global:
+  edition: community
+
+# Disable Azure integrations
+azure:
+  workloadIdentity:
+    enabled: false
+  keyVaultCSI:
+    enabled: false
+  azureFiles:
+    enabled: false
+
+# Disable parent chart features that require CRDs
+ingress:
+  enabled: false
+
+airbyte:
+  global:
+    edition: community
+    
+  ingress:
+    enabled: false
+    
+  webapp:
+    ingress:
+      enabled: false
+  
+  # Use existing PostgreSQL database  
+  postgresql:
+    enabled: true
+    auth:
+      postgresPassword: "airbyte123"
+      username: "airbyte"
+      database: "airbyte"
+    primary:
+      persistence:
+        enabled: true
+        existingClaim: "airbyte-volume-db-airbyte-db-0"
+  
+  # Basic resource settings
+  server:
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "125m"
+      limits:
+        memory: "512Mi"  
+        cpu: "250m"
+  
+  worker:
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+        
+  # Use internal database configuration
+  externalDatabase:
+    host: "airbyte-db-svc"
+    port: 5432
+    database: "airbyte"  
+    user: "airbyte"
+    existingSecret: "airbyte-config-secrets"
+    existingSecretPasswordKey: "database-password"
+    existingSecretUsernameKey: "database-user"

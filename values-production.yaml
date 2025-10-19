@@ -6,7 +6,7 @@ global:
   airbyteUrl: "https://airbyte.yourdomain.com"
   
   image:
-    tag: "1.8.0"
+    tag: "2.0.0"
     pullPolicy: IfNotPresent
     # Use your Azure Container Registry
     registry: "youracr.azurecr.io"
@@ -96,6 +96,7 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
+          backend: server
   
   tls:
     - secretName: airbyte-tls

@@ -1,0 +1,10 @@
+airbyte:
+  global:
+    edition: community
+  ingress:
+    enabled: false
+  webapp:
+    ingress:
+      enabled: false
+  postgresql:
+    enabled: true

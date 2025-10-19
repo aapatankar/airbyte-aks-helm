@@ -1,0 +1,146 @@
+# Clean Airbyte 2.0 Deployment Values
+# This file contains working configuration for fresh deployment
+
+global:
+  edition: community
+  storage:
+    type: minio
+
+# Disable Azure integrations (no CRDs installed)
+azure:
+  workloadIdentity:
+    enabled: false
+  keyVaultCSI:
+    enabled: false
+  azureFiles:
+    enabled: false
+
+# Disable all parent chart features that require external CRDs
+backup:
+  enabled: false
+monitoring:
+  enabled: false
+autoscaling:
+  enabled: false
+development:
+  enabled: false
+
+# Disable security features that create conflicting resources
+security:
+  podSecurityStandards:
+    enabled: false
+  networkPolicies:
+    enabled: false
+
+# Disable parent chart ingress
+ingress:
+  enabled: false
+
+airbyte:
+  global:
+    edition: community
+    
+  # Use simple no-op secrets manager (no external secrets)
+  secretsManager:
+    enabled: false
+    type: ""
+  
+  # Configure MinIO storage (not Azure)
+  storage:
+    type: minio
+    minio:
+      enabled: true
+      accessKeyId: minio
+      secretAccessKey: minio123
+    bucket:
+      log: airbyte-bucket
+      auditLogging: airbyte-bucket  
+      state: airbyte-bucket
+      workloadOutput: airbyte-bucket
+      activityPayload: airbyte-bucket
+  
+  # Add resource limits for bootloader to satisfy quota
+  bootloader:
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "50m"
+      limits:
+        memory: "128Mi"
+        cpu: "100m"
+    
+  # Disable ingress for now
+  ingress:
+    enabled: false
+    
+  webapp:
+    ingress:
+      enabled: false
+  
+  # Use existing PostgreSQL database with correct credentials
+  postgresql:
+    enabled: true
+    auth:
+      postgresPassword: "airbyte"  # Match the existing database password
+      username: "airbyte"
+      database: "airbyte"
+    primary:
+      persistence:
+        enabled: true
+        existingClaim: "airbyte-volume-db-airbyte-db-0"
+  
+  # Basic resource settings for development
+  server:
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"  
+        cpu: "1000m"
+  
+  worker:
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+        
+  # Disable monitoring for now
+  monitoring:
+    enabled: false
+    
+  # Single replica for development
+  replicaCount: 1
+  
+  # Configure database connection without TLS (for development)
+  database:
+    tls:
+      enabled: false
+  
+  # Configure Temporal database connection without TLS
+  temporal:
+    database:
+      tls:
+        enabled: false
+  
+  # Basic security settings
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+
+# MinIO configuration (top-level, outside airbyte section)
+minio:
+  enabled: true
+  rootUser: minio
+  rootPassword: minio123
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "200m"
